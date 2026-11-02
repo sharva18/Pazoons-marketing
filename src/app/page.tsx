@@ -1,103 +1,89 @@
-import Image from "next/image";
+import { getOverviewStats } from "@/lib/stats";
+import { formatMoney, formatNumber, formatPct } from "@/lib/format";
+import { Card, CardTitle, PageTitle, Stat } from "@/components/ui";
+import { BarList } from "@/components/BarList";
+import { WinbackEstimator } from "@/components/WinbackEstimator";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function OverviewPage() {
+  const s = await getOverviewStats();
+  const pct = (n: number) => formatPct(s.total ? n / s.total : 0);
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <>
+      <PageTitle sub="How many customers come back — and how many we could win back.">Overview</PageTitle>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Stat label="Customers" value={formatNumber(s.total)} sub={`${formatNumber(s.buckets.active)} ordered in last 30d`} />
+        <Stat
+          label="Repeat rate"
+          value={formatPct(s.repeatRate)}
+          sub={`${formatNumber(s.repeat)} ordered 2+ times`}
+        />
+        <Stat label="Lapsed 30d+" value={formatNumber(s.lapsedTotal)} sub={`${pct(s.lapsedTotal)} of customers`} />
+        <Stat label="Avg order" value={formatMoney(s.avgOrderCents)} sub="last 12 months" />
+      </div>
+
+      <Card className="mt-4">
+        <CardTitle hint="Days since each customer's last order. Tap a row to see who.">Last order</CardTitle>
+        <BarList
+          total={s.total}
+          items={[
+            { label: "Last 30 days", value: s.buckets.active, href: "/customers?status=active" },
+            {
+              label: "30–90 days",
+              value: s.buckets.lapsed_30_90,
+              sub: `${formatNumber(s.lapsedReachable.lapsed_30_90)} can be messaged`,
+              href: "/customers?status=lapsed_30_90",
+            },
+            {
+              label: "90–180 days",
+              value: s.buckets.lapsed_90_180,
+              sub: `${formatNumber(s.lapsedReachable.lapsed_90_180)} can be messaged`,
+              href: "/customers?status=lapsed_90_180",
+            },
+            {
+              label: "180+ days",
+              value: s.buckets.lapsed_180_plus,
+              sub: `${formatNumber(s.lapsedReachable.lapsed_180_plus)} can be messaged`,
+              href: "/customers?status=lapsed_180_plus",
+            },
+          ]}
+        />
+      </Card>
+
+      <Card className="mt-4">
+        <CardTitle hint="Valid CASL consent and not opted out.">Who we can reach</CardTitle>
+        <BarList
+          total={s.total}
+          items={[
+            { label: "By SMS", value: s.reach.sms, href: "/customers?consent=sms" },
+            { label: "By email", value: s.reach.email, href: "/customers?consent=email" },
+            { label: "By SMS or email", value: s.reach.either, href: "/customers?consent=either" },
+            { label: "Can't contact", value: s.reach.neither, href: "/customers?consent=none" },
+          ]}
+        />
+      </Card>
+
+      <Card className="mt-4">
+        <CardTitle hint="What bringing lapsed customers back could be worth. Move the sliders.">
+          Win-back estimate
+        </CardTitle>
+        <WinbackEstimator
+          lapsed={{
+            lapsed_30_90: s.buckets.lapsed_30_90,
+            lapsed_90_180: s.buckets.lapsed_90_180,
+            lapsed_180_plus: s.buckets.lapsed_180_plus,
+          }}
+          lapsedReachable={{
+            lapsed_30_90: s.lapsedReachable.lapsed_30_90,
+            lapsed_90_180: s.lapsedReachable.lapsed_90_180,
+            lapsed_180_plus: s.lapsedReachable.lapsed_180_plus,
+          }}
+          avgOrderCents={s.avgOrderCents}
+        />
+      </Card>
+    </>
   );
 }

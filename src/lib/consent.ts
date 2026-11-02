@@ -57,3 +57,31 @@ export function canContact(
     (c) => isConsentValid(c, customer.lastOrderAt, now) && (!latestRevocation || c.grantedAt > latestRevocation),
   );
 }
+
+export type ConsentStatus = "ok" | "no_address" | "suppressed" | "revoked" | "expired" | "none";
+
+export const CONSENT_STATUS_LABELS: Record<ConsentStatus, string> = {
+  ok: "Opted in",
+  no_address: "No contact",
+  suppressed: "Opted out",
+  revoked: "Opted out",
+  expired: "Consent expired",
+  none: "No consent",
+};
+
+/** Why can / can't we message this customer on this channel? (for badges and the audit view) */
+export function consentStatus(
+  customer: { phone: string | null; email: string | null; lastOrderAt: Date | null; consents: ConsentLike[] },
+  channel: MessageChannel,
+  suppressed: boolean,
+  now: Date = new Date(),
+): ConsentStatus {
+  const address = channel === "sms" ? customer.phone : customer.email;
+  if (!address) return "no_address";
+  if (suppressed) return "suppressed";
+  if (canContact(customer, channel, false, now)) return "ok";
+  const records = customer.consents.filter((c) => c.channel === channel);
+  if (records.some((c) => c.revokedAt)) return "revoked";
+  if (records.some((c) => c.type === "implied")) return "expired";
+  return "none";
+}

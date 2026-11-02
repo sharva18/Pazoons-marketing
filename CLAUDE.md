@@ -81,7 +81,7 @@ Automation, Redemption (promo codes, to track what worked). Plus a Suppression l
 ## Build order
 
 1. Schema + seed script  ← **done**
-2. Dashboard + customer list
+2. Dashboard + customer list  ← **done**
 3. CSV import
 4. Campaign composer + test-mode sending + opt-out handling
 5. Automations engine
@@ -94,3 +94,7 @@ Automation, Redemption (promo codes, to track what worked). Plus a Suppression l
 - `npm run db:seed` — seed only.
 - `npm run dev` — start the app.
 - Seed logic lives in `prisma/seed.ts`; shared constants (deals, neighbourhoods, shop info) in `src/lib/`.
+- Reachability (CASL consent) is time-dependent, so it is computed in code (`src/lib/consent.ts`,
+  `src/lib/customers.ts#loadCustomerIndex`) rather than stored. The customer list loads all customers into
+  memory and filters there — fine at single-shop scale; move filtering to SQL with Postgres / multi-shop.
+- UI tokens live in `src/app/globals.css` (light + dark). Consent badges always pair colour with an icon + label.
