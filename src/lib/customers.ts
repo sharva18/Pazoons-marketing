@@ -38,10 +38,12 @@ export type CustomerRow = {
   bucket: RecencyBucket;
   sms: ConsentStatus;
   email_: ConsentStatus;
+  /** share of this customer's orders placed through DoorDash / Uber Eats (0–1) */
+  appShare: number;
 };
 
 export async function loadCustomerIndex(now: Date = new Date()): Promise<CustomerRow[]> {
-  const [customers, suppressions] = await Promise.all([
+  const [customers, suppressions, channelCounts] = await Promise.all([
     prisma.customer.findMany({
       select: {
         id: true,
@@ -57,8 +59,16 @@ export async function loadCustomerIndex(now: Date = new Date()): Promise<Custome
       },
     }),
     prisma.suppression.findMany({ select: { channel: true, value: true } }),
+    prisma.order.groupBy({ by: ["customerId", "channel"], _count: { _all: true } }),
   ]);
   const suppressed = new Set(suppressions.map((s) => `${s.channel}:${s.value}`));
+  const appOrders = new Map<string, { app: number; all: number }>();
+  for (const g of channelCounts) {
+    const e = appOrders.get(g.customerId) ?? { app: 0, all: 0 };
+    e.all += g._count._all;
+    if (g.channel === "doordash" || g.channel === "ubereats") e.app += g._count._all;
+    appOrders.set(g.customerId, e);
+  }
 
   return customers.map((c) => {
     const daysSinceLast = c.lastOrderAt ? daysBetween(c.lastOrderAt, now) : null;
@@ -76,6 +86,10 @@ export async function loadCustomerIndex(now: Date = new Date()): Promise<Custome
       bucket: recencyBucket(daysSinceLast),
       sms: consentStatus(c, "sms", !!c.phone && suppressed.has(`sms:${c.phone}`), now),
       email_: consentStatus(c, "email", !!c.email && suppressed.has(`email:${c.email}`), now),
+      appShare: (() => {
+        const e = appOrders.get(c.id);
+        return e && e.all ? e.app / e.all : 0;
+      })(),
     };
   });
 }

@@ -7,6 +7,8 @@ import { formatDate, formatDaysAgo, formatMoney, daysBetween } from "@/lib/forma
 import { ORDER_CHANNEL_LABELS, DIRECT_ORDER_CHANNELS, type OrderChannel } from "@/lib/constants";
 import { Card, CardTitle, ConsentBadge } from "@/components/ui";
 import { RECENCY_LABELS, recencyBucket } from "@/lib/customers";
+import { config } from "@/lib/config";
+import { simulateSmsReplyAction } from "../../promo/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -127,6 +129,24 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           ))}
         </ul>
       </Card>
+
+      {config.testMode && c.phone && (
+        <Card className="mt-4 border-warn/40">
+          <CardTitle hint="Test mode: pretend this customer texted the shop. Try STOP, START, HELP or ARRET.">Simulate a text reply</CardTitle>
+          <form action={simulateSmsReplyAction.bind(null, c.id)} className="flex gap-2">
+            <input
+              name="body"
+              required
+              defaultValue="STOP"
+              aria-label="Reply text"
+              className="min-w-0 flex-1 rounded-xl border border-line bg-card px-3 py-2.5 text-base"
+            />
+            <button type="submit" className="rounded-xl border border-line bg-card-2 px-4 font-medium">
+              Receive
+            </button>
+          </form>
+        </Card>
+      )}
 
       {c.messages.length > 0 && (
         <Card className="mt-4">

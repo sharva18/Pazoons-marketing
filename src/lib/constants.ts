@@ -25,7 +25,7 @@ export const ORDER_CHANNEL_LABELS: Record<OrderChannel, string> = {
 
 export const CONSENT_TYPES = ["express", "implied"] as const;
 export type ConsentType = (typeof CONSENT_TYPES)[number];
-export const CONSENT_SOURCES = ["purchase", "optin_page", "counter", "import", "phone_call"] as const;
+export const CONSENT_SOURCES = ["purchase", "optin_page", "counter", "import", "phone_call", "sms_keyword"] as const;
 export type ConsentSource = (typeof CONSENT_SOURCES)[number];
 
 /** CASL: implied consent from a purchase lasts 2 years from the last purchase. */

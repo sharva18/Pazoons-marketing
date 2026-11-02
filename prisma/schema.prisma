@@ -71,7 +71,7 @@ model Consent {
   channel    String // sms | email
   type       String // express | implied
   grantedAt  DateTime
-  source     String // purchase | optin_page | counter | import | phone_call
+  source     String // purchase | optin_page | counter | import | phone_call | sms_keyword
   evidence   String? // free text: form IP/user agent, staff initials, import file name...
   revokedAt  DateTime?
   revokeReason String? // STOP | unsubscribe | manual | complaint

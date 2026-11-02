@@ -32,3 +32,8 @@ export function countSms(text: string): SmsCount {
 export const SMS_COST_CENTS_PER_SEGMENT = 0.83;
 /** Rough Postmark cost per email, in USD cents. */
 export const EMAIL_COST_CENTS = 0.12;
+
+/** Estimated campaign cost in US cents. */
+export function estimateCostCents(channel: "sms" | "email", recipients: number, segmentsPerMessage = 1): number {
+  return Math.round(recipients * (channel === "sms" ? SMS_COST_CENTS_PER_SEGMENT * segmentsPerMessage : EMAIL_COST_CENTS));
+}

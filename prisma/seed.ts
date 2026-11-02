@@ -22,6 +22,7 @@ import { canContact, impliedConsentExpiry } from "../src/lib/consent";
 import { isFictionalPhone } from "../src/lib/contact";
 import { buildSmsBody, buildEmailBody } from "../src/lib/compliance";
 import { countSms } from "../src/lib/sms";
+import { unsubscribeUrl } from "../src/lib/messaging/tokens";
 
 const prisma = new PrismaClient();
 
@@ -559,7 +560,7 @@ async function main() {
       const isSms = pc.channel === "sms";
       const body = isSms
         ? buildSmsBody(pc.body, c.firstName)
-        : buildEmailBody(pc.body, c.firstName, `https://repeatslice.example.com/u/${c.id}`);
+        : buildEmailBody(pc.body, c.firstName, unsubscribeUrl(c.id));
       messages.push({
         customerId: c.id,
         campaignId: campaign.id,

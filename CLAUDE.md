@@ -83,7 +83,7 @@ Automation, Redemption (promo codes, to track what worked). Plus a Suppression l
 1. Schema + seed script  ← **done**
 2. Dashboard + customer list  ← **done**
 3. CSV import  ← **done**
-4. Campaign composer + test-mode sending + opt-out handling
+4. Campaign composer + test-mode sending + opt-out handling  ← **done**
 5. Automations engine
 6. Opt-in page + QR code
 7. Redemption tracking and results
@@ -107,3 +107,18 @@ Automation, Redemption (promo codes, to track what worked). Plus a Suppression l
 - `MOCK_DATA_ONLY` (default true): imports reject phones outside 555-01xx and emails not @example.com.
 - `public/samples/pazoons-sample-import.csv` is generated from the seed by `npx tsx scripts/make-sample-import.ts`.
   The seed is deterministic regardless of date/time of day (fixed RNG draws), so the sample keeps matching.
+- Route groups: `src/app/(app)` = owner screens (header + tab bar), `src/app/(public)` = public pages
+  (unsubscribe `/u/[token]`, opt-in page in step 6). No owner nav on public pages.
+- Messaging (`src/lib/messaging/`): `campaigns.ts` creates/dispatches campaigns. Recipients are chosen at SEND
+  time (consent re-checked); dispatch is claimed atomically and resumable (skips customers already messaged).
+  SMS outside 9:00–21:00 Toronto is moved to the next 9:00; a send crossing 21:00 pauses until morning.
+  `providers.ts` calls Twilio/Postmark REST; test mode blocks non-test addresses; no creds → simulated.
+  `optout.ts`: STOP/ARRET/etc → suppression + revoke all active consents instantly; START → express re-opt-in.
+- Endpoints: `POST /api/webhooks/twilio` (inbound SMS, signature-checked when TWILIO_AUTH_TOKEN is set),
+  `POST /api/webhooks/postmark?token=` (complaints/hard bounces), `POST /api/unsubscribe/[token]` (RFC 8058
+  one-click), `GET /api/cron/dispatch` (Bearer CRON_SECRET). In test mode the customer page has a
+  "Simulate a text reply" box to try STOP/START/HELP without Twilio.
+- SMS templates (`src/lib/templates.ts`) must fit ONE GSM-7 segment incl. the auto shop name + STOP footer
+  (enforced by `templates.test.ts`). Cost estimates are rough US-cent figures in `src/lib/sms.ts`.
+- Sending happens inside the request for now (fine for ~1k recipients in test mode). Before real volume,
+  move dispatch to a background worker/queue and honour Twilio rate limits.
