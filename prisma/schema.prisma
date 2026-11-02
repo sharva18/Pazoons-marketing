@@ -1,0 +1,202 @@
+// RepeatSlice data model.
+// SQLite for now, Postgres later: keep it portable (no native enums, no SQLite-only features).
+// "Enum-like" string fields list their allowed values in comments; the TS source of truth is src/lib/constants.ts.
+// Money is stored in integer cents.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id            String    @id @default(cuid())
+  firstName     String
+  lastName      String?
+  phone         String?   @unique // E.164, e.g. +15195550123 (mock data: 555-01xx only)
+  email         String?   @unique // lower-cased (mock data: @example.com only)
+  neighbourhood String?
+  postalFsa     String? // first 3 chars of postal code, e.g. N5V
+  birthMonth    Int? // 1-12
+  birthDay      Int? // 1-31
+  source        String    @default("import") // seed | import | optin_page | pos
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Denormalised order stats, refreshed whenever orders change (fast dashboard + segment queries).
+  firstOrderAt  DateTime?
+  lastOrderAt   DateTime?
+  orderCount    Int       @default(0)
+  totalSpentCents Int     @default(0)
+
+  orders      Order[]
+  consents    Consent[]
+  messages    Message[]
+  redemptions Redemption[]
+  automationRuns AutomationRun[]
+
+  @@index([lastOrderAt])
+  @@index([neighbourhood])
+}
+
+model Order {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  placedAt    DateTime
+  channel     String // phone | walk_in | doordash | ubereats | online
+  totalCents  Int
+  dealName    String? // e.g. "Family Deal"
+  items       String // human-readable summary, e.g. "Family Deal + Cheesy breadsticks"
+  createdAt   DateTime @default(now())
+
+  redemption Redemption?
+
+  @@index([customerId, placedAt])
+  @@index([placedAt])
+}
+
+// CASL: consent is stored per channel, with type, date, source and revocation.
+// Implied consent (from a purchase) expires 2 years after the customer's LAST purchase,
+// so validity is computed from Customer.lastOrderAt (see src/lib/consent.ts), not stored.
+// Rows are never deleted: a re-grant after revocation creates a new row (audit trail).
+model Consent {
+  id         String    @id @default(cuid())
+  customerId String
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  channel    String // sms | email
+  type       String // express | implied
+  grantedAt  DateTime
+  source     String // purchase | optin_page | counter | import | phone_call
+  evidence   String? // free text: form IP/user agent, staff initials, import file name...
+  revokedAt  DateTime?
+  revokeReason String? // STOP | unsubscribe | manual | complaint
+  createdAt  DateTime  @default(now())
+
+  @@index([customerId, channel])
+  @@index([channel, revokedAt])
+}
+
+// CASL: anyone who replies STOP or unsubscribes lands here instantly.
+// Imports and opt-in forms must check this list; re-imports NEVER override it.
+model Suppression {
+  id        String   @id @default(cuid())
+  channel   String // sms | email
+  value     String // normalised phone (E.164) or lower-cased email
+  reason    String // STOP | unsubscribe | complaint | bounce | manual
+  createdAt DateTime @default(now())
+
+  @@unique([channel, value])
+}
+
+model Campaign {
+  id            String    @id @default(cuid())
+  name          String
+  channel       String // sms | email
+  segment       String // segment key, e.g. lapsed_30_90 (see src/lib/constants.ts)
+  subject       String? // email only
+  body          String // may contain {name}
+  promoCode     String?
+  status        String    @default("draft") // draft | scheduled | sending | sent | cancelled
+  scheduledAt   DateTime?
+  sentAt        DateTime?
+  recipientCount Int      @default(0)
+  excludedCount  Int      @default(0) // no consent / suppressed
+  estCostCents   Int      @default(0)
+  testMode      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  messages    Message[]
+  redemptions Redemption[]
+
+  @@index([status, scheduledAt])
+}
+
+model Message {
+  id           String    @id @default(cuid())
+  customerId   String?
+  customer     Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  campaignId   String?
+  campaign     Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  automationId String?
+  automation   Automation? @relation(fields: [automationId], references: [id], onDelete: SetNull)
+  direction    String    @default("outbound") // outbound | inbound
+  channel      String // sms | email
+  to           String
+  from         String?
+  subject      String?
+  body         String
+  segments     Int       @default(1) // SMS segments
+  status       String    @default("queued") // queued | held_quiet_hours | sent | delivered | failed | blocked | received
+  provider     String? // twilio | postmark | test
+  providerId   String?
+  testMode     Boolean   @default(true)
+  error        String?
+  createdAt    DateTime  @default(now())
+  sentAt       DateTime?
+
+  @@index([customerId, createdAt])
+  @@index([campaignId])
+  @@index([automationId, createdAt])
+  @@index([status])
+}
+
+model Automation {
+  id          String    @id @default(cuid())
+  key         String    @unique // winback | first_order_thanks | birthday_week | fifth_order | feedback
+  name        String
+  description String
+  enabled     Boolean   @default(false)
+  channel     String    @default("sms") // sms | email | both (sms preferred, email fallback)
+  body        String // template with {name}
+  promoCode   String?
+  config      String    @default("{}") // JSON, e.g. {"daysWithoutOrder":30,"cooldownDays":60}
+  lastRunAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  messages    Message[]
+  redemptions Redemption[]
+  runs        AutomationRun[]
+}
+
+// One row per (automation, customer, trigger) so the daily job is idempotent and cooldowns are enforceable.
+model AutomationRun {
+  id           String     @id @default(cuid())
+  automationId String
+  automation   Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  customerId   String
+  customer     Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  triggerKey   String // e.g. order id, "2026-birthday", "winback-2026-11-02"
+  createdAt    DateTime   @default(now())
+
+  @@unique([automationId, customerId, triggerKey])
+  @@index([automationId, customerId, createdAt])
+}
+
+// A promo code issued to a customer (by a campaign or automation) and, once used, the order it was redeemed on.
+// issued vs redeemed = "what worked".
+model Redemption {
+  id           String      @id @default(cuid())
+  code         String
+  customerId   String?
+  customer     Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  campaignId   String?
+  campaign     Campaign?   @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  automationId String?
+  automation   Automation? @relation(fields: [automationId], references: [id], onDelete: SetNull)
+  issuedAt     DateTime    @default(now())
+  redeemedAt   DateTime?
+  orderId      String?     @unique
+  order        Order?      @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  discountCents Int        @default(0)
+
+  @@index([code])
+  @@index([campaignId])
+  @@index([automationId])
+}
