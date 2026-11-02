@@ -82,7 +82,7 @@ Automation, Redemption (promo codes, to track what worked). Plus a Suppression l
 
 1. Schema + seed script  ← **done**
 2. Dashboard + customer list  ← **done**
-3. CSV import
+3. CSV import  ← **done**
 4. Campaign composer + test-mode sending + opt-out handling
 5. Automations engine
 6. Opt-in page + QR code
@@ -93,8 +93,17 @@ Automation, Redemption (promo codes, to track what worked). Plus a Suppression l
 - `npm run db:reset` — recreate the SQLite DB and seed it.
 - `npm run db:seed` — seed only.
 - `npm run dev` — start the app.
+- `npm test` — vitest (CASL consent rules, import planner). Run before pushing.
 - Seed logic lives in `prisma/seed.ts`; shared constants (deals, neighbourhoods, shop info) in `src/lib/`.
 - Reachability (CASL consent) is time-dependent, so it is computed in code (`src/lib/consent.ts`,
   `src/lib/customers.ts#loadCustomerIndex`) rather than stored. The customer list loads all customers into
   memory and filters there — fine at single-shop scale; move filtering to SQL with Postgres / multi-shop.
 - UI tokens live in `src/app/globals.css` (light + dark). Consent badges always pair colour with an icon + label.
+- CSV import (`/customers/import`): `src/lib/import/plan.ts` is a pure planner used for both the dry-run preview
+  and the real import (the server always re-plans; it never trusts a plan from the browser). Rules: dedupe by phone
+  OR email (chains merge); match existing by phone then email; phone→A + email→B = conflict, skipped; existing
+  customers only get blanks filled; suppression list / past revocations are never overridden; express consent only
+  from an explicit opt-in column, implied only from a purchase < 2 years old. Each import writes an `ImportBatch`.
+- `MOCK_DATA_ONLY` (default true): imports reject phones outside 555-01xx and emails not @example.com.
+- `public/samples/pazoons-sample-import.csv` is generated from the seed by `npx tsx scripts/make-sample-import.ts`.
+  The seed is deterministic regardless of date/time of day (fixed RNG draws), so the sample keeps matching.

@@ -49,7 +49,15 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
 
   return (
     <>
-      <PageTitle sub={`${formatNumber(all.length)} customers`}>Customers</PageTitle>
+      <div className="flex items-start justify-between gap-3">
+        <PageTitle sub={`${formatNumber(all.length)} customers`}>Customers</PageTitle>
+        <Link
+          href="/customers/import"
+          className="mt-1 shrink-0 rounded-xl border border-line bg-card px-3 py-2 text-sm font-medium"
+        >
+          Import CSV
+        </Link>
+      </div>
 
       <form action="/customers" className="flex gap-2">
         {status !== "all" && <input type="hidden" name="status" value={status} />}
@@ -114,7 +122,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Se
               <Link href={`/customers/${c.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-card-2">
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">
-                    {c.firstName} {c.lastName}
+                    {`${c.firstName} ${c.lastName ?? ""}`.trim() || "(no name)"}
                   </div>
                   <div className="truncate text-sm text-muted">
                     {[c.neighbourhood, c.phone ? formatPhone(c.phone) : c.email].filter(Boolean).join(" · ")}

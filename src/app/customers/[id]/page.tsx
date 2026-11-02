@@ -45,7 +45,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       </Link>
       <div className="mt-2 mb-4">
         <h1 className="text-2xl font-bold tracking-tight">
-          {c.firstName} {c.lastName}
+          {`${c.firstName} ${c.lastName ?? ""}`.trim() || "(no name)"}
         </h1>
         <p className="text-sm text-muted">
           {[c.neighbourhood, c.postalFsa].filter(Boolean).join(" · ")}

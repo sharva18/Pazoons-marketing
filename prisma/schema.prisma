@@ -200,3 +200,18 @@ model Redemption {
   @@index([campaignId])
   @@index([automationId])
 }
+
+// Audit record for each CSV import (consent evidence points here: "import:<id>").
+model ImportBatch {
+  id            String   @id @default(cuid())
+  fileName      String
+  rowCount      Int
+  createdCount  Int      @default(0)
+  updatedCount  Int      @default(0)
+  skippedCount  Int      @default(0)
+  consentsAdded Int      @default(0)
+  optOutsAdded  Int      @default(0)
+  mapping       String // JSON: target field -> source column
+  options       String   @default("{}") // JSON
+  createdAt     DateTime @default(now())
+}

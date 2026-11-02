@@ -30,7 +30,9 @@ const CUSTOMER_COUNT = 1200;
 const DAY = 86_400_000;
 const LOCAL_OFFSET_H = -5; // America/Toronto standard time; good enough for mock timestamps
 
-const NOW = process.env.SEED_NOW ? new Date(`${process.env.SEED_NOW}T17:00:00-05:00`) : new Date();
+const NOW = process.env.SEED_NOW
+  ? new Date(process.env.SEED_NOW.includes("T") ? process.env.SEED_NOW : `${process.env.SEED_NOW}T17:00:00-05:00`)
+  : new Date();
 const rng = createRng(SEED);
 
 // ---------- helpers ----------
@@ -72,11 +74,14 @@ function lastOrderTimeInBucket(b: number): Date {
     [90, 179],
     [180, 800], // a slice of these are > 2 years → implied consent expired
   ];
-  for (let attempt = 0; attempt < 20; attempt++) {
-    const t = orderTime(rng.int(...ranges[b]));
-    if (t < NOW && bucketOf(daysAgo(t)) === b) return t;
+  // Uses a fixed number of RNG draws (so every later customer is identical whatever the time of day),
+  // then nudges the time deterministically if it landed in the future or across a bucket edge.
+  let t = orderTime(rng.int(...ranges[b]));
+  if (t >= NOW) t = new Date(NOW.getTime() - 3600_000);
+  for (let i = 0; i < 3 && bucketOf(daysAgo(t)) !== b; i++) {
+    t = new Date(t.getTime() + (bucketOf(daysAgo(t)) < b ? -DAY : DAY));
   }
-  return new Date(NOW.getTime() - (ranges[b][0] + 0.5) * DAY);
+  return t;
 }
 
 function dealPrice(deal: Deal): number {
